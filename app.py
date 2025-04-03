@@ -27,15 +27,37 @@ def convert():
         vcf_data = vcf_file.read().decode('utf-8')
         vcards = vobject.readComponents(vcf_data)
         
-        # Extract contact information
+        # Extract all available contact information
         contacts = []
         for vcard in vcards:
-            contact = {
-                'Name': getattr(vcard, 'fn', None) and vcard.fn.value or '',
-                'Phone': getattr(vcard, 'tel', None) and vcard.tel.value or '',
-                'Email': getattr(vcard, 'email', None) and vcard.email.value or '',
-                'Address': getattr(vcard, 'adr', None) and format_address(vcard.adr.value) or ''
-            }
+            contact = {}
+            # Standard fields
+            contact['Name'] = getattr(vcard, 'fn', None) and vcard.fn.value or ''
+            contact['Organization'] = getattr(vcard, 'org', None) and vcard.org.value or ''
+            contact['Title'] = getattr(vcard, 'title', None) and vcard.title.value or ''
+            
+            # Handle multiple phone numbers - each in separate column
+            for tel in getattr(vcard, 'tel_list', []):
+                phone_type = tel.type_param.lower() if hasattr(tel, 'type_param') else 'other'
+                contact[f'Phone_{phone_type}'] = tel.value
+            
+            # Handle multiple emails
+            emails = []
+            for email in getattr(vcard, 'email_list', []):
+                emails.append(email.value)
+            contact['Emails'] = ' | '.join(emails) if emails else ''
+            
+            # Handle addresses
+            addresses = []
+            for adr in getattr(vcard, 'adr_list', []):
+                addresses.append(format_address(adr.value))
+            contact['Addresses'] = ' | '.join(addresses) if addresses else ''
+            
+            # Additional fields
+            contact['Note'] = getattr(vcard, 'note', None) and vcard.note.value or ''
+            contact['URL'] = getattr(vcard, 'url', None) and vcard.url.value or ''
+            contact['Birthday'] = getattr(vcard, 'bday', None) and vcard.bday.value or ''
+            
             contacts.append(contact)
         
         # Create DataFrame and Excel file
@@ -65,4 +87,4 @@ def format_address(address):
     ]))
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=True, port=8000)
